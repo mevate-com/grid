@@ -1,8 +1,9 @@
 import express from 'express';
 
 import {Sequelize} from 'sequelize-typescript';
-import {User} from "./models/user";
-import {Organization} from "./models/organization";
+import {createDataset, getDatasets} from "./functions/dataset-management.func";
+import {DataSet} from "./models/dataSet";
+import {DataField} from "./models/dataField";
 
 
 export const sequelize = new Sequelize({
@@ -12,7 +13,7 @@ export const sequelize = new Sequelize({
     host: process.env.DATABASE_URL,
     port: 5432,
     dialect: 'postgres',
-    models: [User, Organization],
+    models: [DataSet, DataField],
 });
 
 sequelize.authenticate().then(
@@ -24,11 +25,27 @@ const PORT: string | number = process.env.PORT || 5000;
 const router = express.Router();
 
 app.use(router);
-app.get('/api/v1', (req, res) => {
-    User.findAll({
-        include: Organization
-    }).then(
-        d => res.send(d)
-    );
+app.get('/datasets/', async (req, res) => {
+    res.send(await getDatasets(sequelize));
 });
+app.get('/dataset/create', async (req, res) => {
+    console.log(123)
+    await createDataset(sequelize);
+    console.log(123)
+    res.send({});
+});
+app.get('/dataset/update', async (req, res) => {
+    console.log(123)
+    await createDataset(sequelize);
+    console.log(123)
+    res.send({});
+});
+app.get('/dataset/delete', async (req, res) => {
+    console.log(123)
+    await createDataset(sequelize);
+    console.log(123)
+    res.send({});
+});
+
+
 app.listen(PORT, () => console.log(`[Server] Starting on http://localhost:${PORT}`));

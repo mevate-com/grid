@@ -1,7 +1,7 @@
 version: "3.7"
 services:
   db:
-    container_name: minimal-database
+    container_name: grid-database
     restart: unless-stopped
     image: postgres
     env_file:
@@ -11,11 +11,11 @@ services:
       POSTGRES_USER: $POSTGRES_USER
       POSTGRES_DB: $POSTGRES_DB
     volumes:
-      - minimal-database-data:/var/lib/postgresql/data/ # persist data even if container shuts down
+      - grid-database-data:/var/lib/postgresql/data/ # persist data even if container shuts down
     ports:
       - "5432:5432"
   backend:
-    container_name: minimal-backend
+    container_name: grid-backend
     restart: unless-stopped
     image: "node:14"
     depends_on:
@@ -37,4 +37,4 @@ services:
       DATABASE_USER: $POSTGRES_USER
       DATABASE_NAME: $POSTGRES_DB
 volumes:
-  minimal-database-data: # named volumes can be managed easier using docker-compose
+  grid-database-data: # named volumes can be managed easier using docker-compose
