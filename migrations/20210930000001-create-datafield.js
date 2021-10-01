@@ -10,7 +10,7 @@ module.exports = {
       },
       dataset_id: {
         allowNull: false,
-        type: Sequelize.STRING
+        type: Sequelize.INTEGER
       },
       name: {
         allowNull: false,
@@ -19,6 +19,10 @@ module.exports = {
       type: {
         allowNull: false,
         type: Sequelize.STRING
+      },
+      system: {
+        allowNull: false,
+        type: Sequelize.BOOLEAN
       },
       title: {
         allowNull: false,

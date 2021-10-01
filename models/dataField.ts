@@ -21,5 +21,8 @@ export class DataField extends Model {
     title: string;
 
     @Column
-    settings: string;
+    system: boolean = false;
+
+    @Column('JSON')
+    settings: JSON;
 }

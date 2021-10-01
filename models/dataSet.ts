@@ -8,5 +8,17 @@ export class DataSet extends Model {
     name: string;
 
     @HasMany(() => DataField)
-    users: DataField[];
+    dataFields: DataField[];
+
+    @Column
+    table_name: string;
+
+    @Column
+    title: string;
+
+    @Column
+    pluralTitle: string;
+
+    @Column('JSON')
+    settings: JSON;
 }

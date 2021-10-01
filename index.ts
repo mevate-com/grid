@@ -29,20 +29,17 @@ app.get('/datasets/', async (req, res) => {
     res.send(await getDatasets(sequelize));
 });
 app.get('/dataset/create', async (req, res) => {
-    console.log(123)
-    await createDataset(sequelize);
-    console.log(123)
-    res.send({});
+    res.send(await createDataset(req, sequelize));
 });
 app.get('/dataset/update', async (req, res) => {
     console.log(123)
-    await createDataset(sequelize);
+    await createDataset(req, sequelize);
     console.log(123)
     res.send({});
 });
 app.get('/dataset/delete', async (req, res) => {
     console.log(123)
-    await createDataset(sequelize);
+    await createDataset(req, sequelize);
     console.log(123)
     res.send({});
 });
