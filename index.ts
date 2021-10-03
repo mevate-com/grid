@@ -1,10 +1,16 @@
 import express from 'express';
 
 import {Sequelize} from 'sequelize-typescript';
-import {createDataset, getDatasets} from "./functions/dataset-management.func";
+import {
+    createDataset,
+    deleteDataset,
+    getDatasets,
+    getSingleDataset,
+    updateDataset
+} from "./functions/dataset-management.func";
 import {DataSet} from "./models/dataSet";
 import {DataField} from "./models/dataField";
-
+import bodyParser from 'body-parser';
 
 export const sequelize = new Sequelize({
     username: process.env.DATABASE_USER,
@@ -23,25 +29,24 @@ sequelize.authenticate().then(
 const app = express();
 const PORT: string | number = process.env.PORT || 5000;
 const router = express.Router();
-
+app.use(bodyParser.urlencoded());
+app.use(bodyParser.json());
 app.use(router);
 app.get('/datasets/', async (req, res) => {
     res.send(await getDatasets(sequelize));
 });
-app.get('/dataset/create', async (req, res) => {
+
+app.get('/dataset/:id', async (req, res) => {
+    res.send(await getSingleDataset(req, sequelize));
+});
+app.post('/dataset/', async (req, res) => {
     res.send(await createDataset(req, sequelize));
 });
-app.get('/dataset/update', async (req, res) => {
-    console.log(123)
-    await createDataset(req, sequelize);
-    console.log(123)
-    res.send({});
+app.put('/dataset/:id', async (req, res) => {
+    res.send(await updateDataset(req, sequelize));
 });
-app.get('/dataset/delete', async (req, res) => {
-    console.log(123)
-    await createDataset(req, sequelize);
-    console.log(123)
-    res.send({});
+app.delete('/dataset/:id', async (req, res) => {
+    res.send(await deleteDataset(req, sequelize));
 });
 
 
