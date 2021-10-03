@@ -2,9 +2,15 @@ import {Request} from "express";
 import {Sequelize} from "sequelize-typescript";
 import {DataSet} from "../models/dataSet";
 import {DataField} from "../models/dataField";
-import {QueryTypes} from "sequelize";
+import {Op, QueryTypes} from "sequelize";
 
 export async function getGrid(req: Request, sq: Sequelize) {
+    const queryInterface = await sq.getQueryInterface();
+    // @see https://github.com/sequelize/sequelize/blob/main/lib/dialects/abstract/query-generator.js#L1125
+    const queryGenerator: SequelizeQueryGenerator = (queryInterface as any).queryGenerator as SequelizeQueryGenerator;
+
+    let query: SequelizeQueryGeneratorOptions = {};
+
     const dataSetId = req.params.dataSetId || null;
     if (!dataSetId) {
         return "Error";
@@ -30,25 +36,37 @@ export async function getGrid(req: Request, sq: Sequelize) {
         }
     }
     const selectedFields: DataField[] = buildArrayOfAvailableDataFieldsFromArrayOfFieldNames(dataFields, requestedFields)
+    query.attributes = selectedFields.map(f => sanitizeFieldNames(f.name));
 
     /**
      * Sorting / Ordering
      */
     let order = "";
     if (req.query.sort || req.query.order) {
-        let requestedSortingFields: string[] = [];
         const requestedSorting = (req.query.sort || req.query.order)?.toString() || '';
         const requestedFieldsWithDirection: Array<[string, SortingDirection]> =
-            requestedSorting.split(',').map(field => splitRequestedSortingIntoFieldAndSortingDirection(field));
+            requestedSorting
+                .split(',')
+                .map(field => splitRequestedSortingIntoFieldAndSortingDirection(field));
         // ["title", "ASC"],["id", "ASC"] -> title ASC, id ASC
-        const allowedFields = requestedFieldsWithDirection.filter(fieldWithDirection => {
+        const allowedOrderFields = requestedFieldsWithDirection.filter(fieldWithDirection => {
             return dataFields.find(df => df.name === fieldWithDirection[0])
         });
-        if (allowedFields.length !== 0) {
-            console.log(allowedFields)
-            order = `ORDER BY ` + allowedFields.map(f => f.join(' ')).join(', ');
+        if (allowedOrderFields.length !== 0) {
+            query.order = allowedOrderFields;
         }
     }
+
+    /**
+     * Filtering
+     */
+    let filter = "";
+    if (req.query.filter) {
+        // todo validate json schema
+        const requestedFilter: GridFilter = JSON.parse(req.query.filter.toString());
+        query.where = buildSequelizeFilter(requestedFilter, dataFields);
+    }
+
 
     /**
      * Pagination
@@ -56,19 +74,14 @@ export async function getGrid(req: Request, sq: Sequelize) {
     const requestedPage: number = req.query.page ? Number(req.query.page) || 1 : 1;
     const requestedElementCount: number = req.query.limit ? Number(req.query.limit) || 100 : 100;
     const [limit, offset] = buildPagination(requestedElementCount, requestedPage);
-
+    query.limit = limit;
+    query.offset = offset;
 
     const queryResult: unknown[] =
-        await sq.query(`
-            SELECT ${joinFieldNames(selectedFields)}
-            FROM zz_qhpidth
-            WHERE 1 = 1 
-            ${order}
-            LIMIT ${limit} OFFSET ${offset}
-        `, {
+        await sq.query(queryGenerator.selectQuery('zz_qhpidth', query, null), {
             nest: true,
             type: QueryTypes.SELECT
-        });
+        }).catch(e => ["Error"]); // todo error handling
     return {
         data: queryResult,
         meta: {
@@ -116,16 +129,74 @@ function sanitizeFieldNames(fields: string): string {
 }
 
 function splitRequestedSortingIntoFieldAndSortingDirection(field: string): [string, SortingDirection] {
-    let direction: SortingDirection = 'DESC';
+    let direction: SortingDirection = 'ASC';
     if (field.charAt(0) === '-') {
-        direction = 'ASC';
+        direction = 'DESC';
         field = field.substring(1);
     }
-    return [field, direction];
+    return [sanitizeFieldNames(field), direction];
+}
+
+function buildSequelizeFilter(filter: GridFilter, availableFields: DataField[]) {
+    if (filter.type === 'group') {
+        let operator = Op.and;
+        switch (filter.mode) {
+            case "OR":
+                operator = Op.or;
+                break;
+            case "AND":
+                operator = Op.and;
+                break;
+        }
+        let x: any = {};
+        x[operator] = [
+            ...filter.children.map(child => buildSequelizeFilter(child, availableFields))
+        ]
+        return x;
+    } else {
+        let sub: { [k: string]: unknown } = {};
+        // todo (later) check if field is subfield
+        if (availableFields.map(f => f.name).includes(filter.field)) {
+            sub[filter.field] = filter.value.toString();
+            return sub;
+        } else {
+            return {}
+        }
+    }
 }
 
 export interface GridMetaData {
     rowCount: number;
 }
 
+export interface GridFilterOperation {
+    type: "operation"
+    field: string,
+    value: string | number;
+}
+
+export interface GridFilterGroup {
+    type: "group"
+    mode: SupportedFilterModes,
+    children: GridFilterOperation[];
+}
+
+export type GridFilter = GridFilterGroup | GridFilterOperation;
+
+export type SupportedFilterModes = 'AND' | 'OR';
+
 export type SortingDirection = 'ASC' | 'DESC';
+
+export interface SequelizeQueryGenerator {
+    selectQuery: (tableName: string, options: SequelizeQueryGeneratorOptions, model: any) => string
+}
+
+export interface SequelizeQueryGeneratorOptions {
+    attributes?: string[]; // -> An array of attributes (e.g. ['name', 'birthday']). Default: *
+    where?: string | number | { [key: string]: string }; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
+    order?: Array<[string, SortingDirection]>;// -> e.g. 'id DESC'
+    group?: string;//
+    limit?: number;// -> The maximum count you want to get.
+    offset?: number;//
+}
+
