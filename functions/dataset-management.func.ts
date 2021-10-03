@@ -40,6 +40,7 @@ export async function createDataset(req: Request, sq: Sequelize) {
             return dataSet;
         })
 
+        // todo add createdAt and updatedAt
         await DataField.bulkCreate([{
             dataset_id: dataSet.id,
             name: 'id',

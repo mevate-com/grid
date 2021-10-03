@@ -11,6 +11,7 @@ import {
 import {DataSet} from "./models/dataSet";
 import {DataField} from "./models/dataField";
 import bodyParser from 'body-parser';
+import {getGrid} from "./functions/grid.func";
 
 export const sequelize = new Sequelize({
     username: process.env.DATABASE_USER,
@@ -49,5 +50,8 @@ app.delete('/dataset/:id', async (req, res) => {
     res.send(await deleteDataset(req, sequelize));
 });
 
+app.get('/grid/:dataSetId/', async (req, res) => {
+    res.send(await getGrid(req, sequelize));
+});
 
 app.listen(PORT, () => console.log(`[Server] Starting on http://localhost:${PORT}`));
