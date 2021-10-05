@@ -4,18 +4,14 @@ import {DataSet} from "../models/dataSet";
 import {DataField} from "../models/dataField";
 import {Op, QueryTypes} from "sequelize";
 
-export async function getGrid(req: Request, sq: Sequelize) {
+export async function getGrid(sq: Sequelize, gridData: GridQueryParams) {
     const queryInterface = await sq.getQueryInterface();
     // @see https://github.com/sequelize/sequelize/blob/main/lib/dialects/abstract/query-generator.js#L1125
     const queryGenerator: SequelizeQueryGenerator = (queryInterface as any).queryGenerator as SequelizeQueryGenerator;
 
     let query: SequelizeQueryGeneratorOptions = {};
 
-    const dataSetId = req.params.dataSetId || null;
-    if (!dataSetId) {
-        return "Error";
-    }
-    const dataSet: DataSet | null = await DataSet.findByPk(dataSetId, {
+    const dataSet: DataSet | null = await DataSet.findByPk(gridData.dataSetId, {
         include: DataField
     });
 
@@ -26,32 +22,27 @@ export async function getGrid(req: Request, sq: Sequelize) {
     /**
      * Field selection
      */
-        // todo filter by permission
-    const dataFields: DataField[] = dataSet.dataFields;
-    let requestedFields: string[] = [];
-    if (req.query.fields) {
-        requestedFields = req.query.fields.toString().split(',');
-        if (!requestedFields.includes('id')) {
-            requestedFields.push('id')
-        }
+    // todo filter by permission
+    // always include id field, even if not requested
+    if (gridData.fields.length === 0) {
+        gridData.fields = getFieldNames(dataSet.dataFields);
     }
-    const selectedFields: DataField[] = buildArrayOfAvailableDataFieldsFromArrayOfFieldNames(dataFields, requestedFields)
-    query.attributes = selectedFields.map(f => sanitizeFieldNames(f.name));
+    if (!gridData.fields.includes('id')) {
+        gridData.fields.push('id')
+    }
+    const selectedFields: DataField[] = buildArrayOfAvailableDataFieldsFromArrayOfFieldNames(dataSet.dataFields, gridData.fields)
+    query.attributes = getFieldNames(selectedFields);
 
     /**
      * Sorting / Ordering
      */
-    let order = "";
-    if (req.query.sort || req.query.order) {
-        const requestedSorting = (req.query.sort || req.query.order)?.toString() || '';
-        const requestedFieldsWithDirection: Array<[string, SortingDirection]> =
-            requestedSorting
-                .split(',')
-                .map(field => splitRequestedSortingIntoFieldAndSortingDirection(field));
+    if (gridData.order) {
         // ["title", "ASC"],["id", "ASC"] -> title ASC, id ASC
-        const allowedOrderFields = requestedFieldsWithDirection.filter(fieldWithDirection => {
-            return dataFields.find(df => df.name === fieldWithDirection[0])
+        // allow ordering only by allowed fields
+        const allowedOrderFields = gridData.order.filter(fieldWithDirection => {
+            return dataSet.dataFields.find(df => df.name === fieldWithDirection[0])
         });
+        // if we still have fields left after permission check, add them to order
         if (allowedOrderFields.length !== 0) {
             query.order = allowedOrderFields;
         }
@@ -60,25 +51,28 @@ export async function getGrid(req: Request, sq: Sequelize) {
     /**
      * Filtering
      */
-    let filter = "";
-    if (req.query.filter) {
+    if (gridData.filter) {
         // todo validate json schema
-        const requestedFilter: GridFilter = JSON.parse(req.query.filter.toString());
-        query.where = buildSequelizeFilter(requestedFilter, dataFields);
+        query.where = buildSequelizeFilter(gridData.filter, dataSet.dataFields);
     }
-
 
     /**
      * Pagination
      */
-    const requestedPage: number = req.query.page ? Number(req.query.page) || 1 : 1;
-    const requestedElementCount: number = req.query.limit ? Number(req.query.limit) || 100 : 100;
-    const [limit, offset] = buildPagination(requestedElementCount, requestedPage);
+    if (!gridData.limit && gridData.page) {
+        gridData.limit = 100;
+    }
+    if (!gridData.page) {
+        gridData.page = 1;
+    }
+
+    const [limit, offset] = buildPagination(gridData.limit, gridData.page);
     query.limit = limit;
     query.offset = offset;
 
+
     const queryResult: unknown[] =
-        await sq.query(queryGenerator.selectQuery('zz_qhpidth', query, null), {
+        await sq.query(queryGenerator.selectQuery(dataSet.table_name, query, null), {
             nest: true,
             type: QueryTypes.SELECT
         }).catch(e => ["Error"]); // todo error handling
@@ -114,12 +108,11 @@ function buildPagination(elementsPerPage: number = 100, page: number = 1): [numb
     return [elementsPerPage, offset];
 }
 
-function joinFieldNames(fields: DataField[]): string {
-    const fieldNames = fields.map(f => f.name);
-    return sanitizeFieldNames(fieldNames.join(', '));
+function getFieldNames(fields: DataField[]): string[] {
+    return fields.map(f => f.name);
 }
 
-function sanitizeFieldNames(fields: string): string {
+export function sanitizeFieldNames(fields: string): string {
     return fields
         // just to be sure - should already be taken care of
         // todo sanitize input during DataField creation
@@ -128,16 +121,7 @@ function sanitizeFieldNames(fields: string): string {
         .split("'").join('');
 }
 
-function splitRequestedSortingIntoFieldAndSortingDirection(field: string): [string, SortingDirection] {
-    let direction: SortingDirection = 'ASC';
-    if (field.charAt(0) === '-') {
-        direction = 'DESC';
-        field = field.substring(1);
-    }
-    return [sanitizeFieldNames(field), direction];
-}
-
-function buildSequelizeFilter(filter: GridFilter, availableFields: DataField[]) {
+export function buildSequelizeFilter(filter: GridFilter, availableFields: DataField[]) {
     if (filter.type === 'group') {
         let operator = Op.and;
         switch (filter.mode) {
@@ -163,10 +147,6 @@ function buildSequelizeFilter(filter: GridFilter, availableFields: DataField[]) 
             return {}
         }
     }
-}
-
-export interface GridMetaData {
-    rowCount: number;
 }
 
 export interface GridFilterOperation {
@@ -195,8 +175,16 @@ export interface SequelizeQueryGeneratorOptions {
     attributes?: string[]; // -> An array of attributes (e.g. ['name', 'birthday']). Default: *
     where?: string | number | { [key: string]: string }; // -> A hash with conditions (e.g. {name: 'foo'}) OR an ID as integer
     order?: Array<[string, SortingDirection]>;// -> e.g. 'id DESC'
-    group?: string;//
+    group?: string | string[];//
     limit?: number;// -> The maximum count you want to get.
     offset?: number;//
 }
 
+export interface GridQueryParams {
+    dataSetId: string;
+    fields: string[];
+    filter?: GridFilter;
+    order?: Array<[string, SortingDirection]>;
+    page?: number;
+    limit?: number;
+}
