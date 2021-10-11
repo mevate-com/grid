@@ -1,9 +1,12 @@
 import {Request} from "express";
 import {Sequelize} from "sequelize-typescript";
-import {getGrid, GridQueryParams, sanitizeFieldNames, SortingDirection} from "./grid.func";
+import {sequelize} from "../index";
+import {GridQueryParams} from "./grid.interfaces";
+import {createGridRecord, deleteGridRecord, getGrid, getGridRecord} from "./grid.func";
+import {splitRequestedSortingIntoFieldAndSortingDirection} from "./grid-utils.func";
 
 export async function getGridApi(req: Request, sq: Sequelize) {
-    const {dataSetId } = req.params;
+    const {dataSetId} = req.params;
     const {filter, fields, page, limit} = req.query;
     const sort = req.query.order || req.query.sort;
 
@@ -44,23 +47,45 @@ export async function getGridApi(req: Request, sq: Sequelize) {
 }
 
 export async function getGridRecordApi(req: Request, sq: Sequelize) {
+    const {dataSetId, recordId} = req.params;
+    const {fields} = req.query;
+
+    if (!dataSetId || !recordId) {
+        return "Error";
+    }
+
+    let fieldArray: string[] = [];
+    if (fields) {
+        fieldArray = fields.toString().split(',');
+    }
+
+    return getGridRecord(sq, {dataSetId, recordId, fields: fieldArray})
+}
+
+export async function createGridRecordApi(req: Request, sq: Sequelize) {
+    const body = req.body;
+    const {dataSetId} = req.params;
+    return await createGridRecord(sequelize, {
+        dataSetId,
+        payload: body
+    });
 }
 
 export async function updateGridRecordApi(req: Request, sq: Sequelize) {
 }
 
-export async function createGridRecordApi(req: Request, sq: Sequelize) {
-}
-
 export async function deleteGridRecordApi(req: Request, sq: Sequelize) {
-}
+    const {dataSetId, recordId} = req.params;
+    const {fields} = req.query;
 
-
-export function splitRequestedSortingIntoFieldAndSortingDirection(field: string): [string, SortingDirection] {
-    let direction: SortingDirection = 'ASC';
-    if (field.charAt(0) === '-') {
-        direction = 'DESC';
-        field = field.substring(1);
+    if (!dataSetId || !recordId) {
+        return "Error";
     }
-    return [sanitizeFieldNames(field), direction];
+
+    let fieldArray: string[] = [];
+    if (fields) {
+        fieldArray = fields.toString().split(',');
+    }
+
+    return deleteGridRecord(sq, {dataSetId, recordId, fields: fieldArray})
 }

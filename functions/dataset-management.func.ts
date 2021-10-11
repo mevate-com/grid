@@ -51,9 +51,29 @@ export async function createDataset(req: Request, sq: Sequelize) {
         }, {
             dataset_id: dataSet.id,
             name: 'title',
-            // todo change to uuid
-            type: DataFieldType.Integer,
+            type: DataFieldType.String,
             title: 'Title',
+            settings: '{}',
+        }, {
+            dataset_id: dataSet.id,
+            name: 'trashed',
+            type: DataFieldType.Boolean,
+            title: 'Archiviert',
+            system: true,
+            settings: '{}',
+        }, {
+            dataset_id: dataSet.id,
+            name: 'createdAt',
+            type: DataFieldType.Boolean,
+            title: 'Erstellt',
+            system: true,
+            settings: '{}',
+        }, {
+            dataset_id: dataSet.id,
+            name: 'updatedAt',
+            type: DataFieldType.Boolean,
+            title: 'Geändert',
+            system: true,
             settings: '{}',
         }
         ], rollbackOnFailure).catch(e => {
@@ -69,8 +89,23 @@ export async function createDataset(req: Request, sq: Sequelize) {
                 id: {
                     primaryKey: true,
                     allowNull: false,
-                    type: DataTypes.INTEGER,
+                    type: DataTypes.STRING,
                     defaultValue: DataTypes.UUIDV4
+                },
+                createdAt: {
+                    allowNull: false,
+                    type: DataTypes.DATE,
+                    defaultValue: Sequelize.fn('now')
+                },
+                updatedAt: {
+                    allowNull: false,
+                    type: DataTypes.DATE,
+                    defaultValue: Sequelize.fn('now')
+                },
+                trashed: {
+                    allowNull: false,
+                    type: DataTypes.BOOLEAN,
+                    defaultValue: false
                 },
             }, rollbackOnFailure).catch(e => {
             console.log(e)
