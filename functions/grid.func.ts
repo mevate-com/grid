@@ -6,13 +6,13 @@ import {
     buildFieldSelection,
     buildPagination,
     buildSequelizeFilter,
-    filterPayloadToContainOnlyNormalFields,
+    filterPayloadToContainOnlyAllowedFields,
     getQueryGenerator
 } from "./grid-utils.func";
 import {
     GridQueryParams,
-    GridRecordCreateParams,
-    GridRecordQueryParams,
+    GridRecordCreateParams, GridRecordDeleteParams,
+    GridRecordQueryParams, GridRecordUpdateParams,
     SequelizeSelectQueryOptions
 } from "./grid.interfaces";
 import { v4 } from 'uuid';
@@ -134,7 +134,7 @@ export async function createGridRecord(sq: Sequelize, {payload, dataSetId}: Grid
     // todo required values
     // todo validation
 
-    const actualPayload = filterPayloadToContainOnlyNormalFields(payload, dataSet.dataFields)
+    const actualPayload = filterPayloadToContainOnlyAllowedFields(payload, dataSet.dataFields)
 
     actualPayload.id = v4();
     actualPayload.trashed = false;
@@ -151,11 +151,34 @@ export async function createGridRecord(sq: Sequelize, {payload, dataSetId}: Grid
     return queryResult;
 }
 
-export async function updateGridRecord(sq: Sequelize) {
+export async function updateGridRecord(sq: Sequelize, {payload, dataSetId, recordId}: GridRecordUpdateParams) {
     const queryGenerator = await getQueryGenerator(sq);
+
+    const dataSet: DataSet | null = await DataSet.findByPk(dataSetId, {
+        include: DataField
+    });
+
+    if (!dataSet) {
+        return "Error 2";
+    }
+
+    // todo required values
+    // todo validation
+    const actualPayload = filterPayloadToContainOnlyAllowedFields(payload, dataSet.dataFields)
+
+    actualPayload.updatedAt = (new Date).toISOString();
+    const queryResult: unknown[] =
+        await sq.query(queryGenerator.updateQuery(
+            dataSet.table_name,
+            actualPayload,
+            {id: recordId}), {
+            nest: true,
+            type: QueryTypes.UPDATE
+        }).catch(e => ["Error", e]);
+    return queryResult;
 }
 
-export async function deleteGridRecord(sq: Sequelize, {dataSetId, recordId}: GridRecordQueryParams) {
+export async function deleteGridRecord(sq: Sequelize, {dataSetId, recordId, force}: GridRecordDeleteParams) {
     const queryGenerator = await getQueryGenerator(sq);
 
     let query: SequelizeSelectQueryOptions = {};
@@ -163,6 +186,7 @@ export async function deleteGridRecord(sq: Sequelize, {dataSetId, recordId}: Gri
     const dataSet: DataSet | null = await DataSet.findByPk(dataSetId, {
         include: DataField
     });
+
     if (!dataSet) {
         return "Error 2";
     }
@@ -180,7 +204,6 @@ export async function deleteGridRecord(sq: Sequelize, {dataSetId, recordId}: Gri
             nest: true,
             type: QueryTypes.UPDATE
         }).catch(e => ["Error", e]); // todo error handling
-    console.log(queryResult)
     return {
         data: queryResult[0],
         meta: {

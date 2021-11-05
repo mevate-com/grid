@@ -11,7 +11,13 @@ import {
 import {DataSet} from "./models/dataSet";
 import {DataField} from "./models/dataField";
 import bodyParser from 'body-parser';
-import {createGridRecordApi, deleteGridRecordApi, getGridApi, getGridRecordApi} from "./functions/grid-api";
+import {
+    createGridRecordApi,
+    deleteGridRecordApi,
+    getGridApi,
+    getGridRecordApi,
+    updateGridRecordApi
+} from "./functions/grid-api";
 
 export const sequelize = new Sequelize({
     username: process.env.DATABASE_USER,
@@ -63,7 +69,7 @@ app.post('/grid/:dataSetId/record', async (req, res) => {
 });
 
 app.put('/grid/:dataSetId/record/:recordId', async (req, res) => {
-    res.send(await getGridRecordApi(req, sequelize));
+    res.send(await updateGridRecordApi(req, sequelize));
 });
 
 app.delete('/grid/:dataSetId/record/:recordId', async (req, res) => {

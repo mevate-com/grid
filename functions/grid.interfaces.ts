@@ -59,3 +59,15 @@ export interface GridRecordCreateParams {
     dataSetId: string;
     payload: { [key: string]: unknown };
 }
+
+export interface GridRecordUpdateParams {
+    dataSetId: string;
+    recordId: string;
+    payload: { [key: string]: unknown };
+}
+
+export interface GridRecordDeleteParams {
+    dataSetId: string;
+    recordId: string;
+    force: boolean;
+}

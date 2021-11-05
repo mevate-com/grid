@@ -48,7 +48,7 @@ export function buildFieldSelection(dataSet: DataSet, requestedFields: string[])
     return getFieldNames(selectedFields);
 }
 
-export function filterPayloadToContainOnlyNormalFields(payload: { [key: string]: unknown }, availableFields: DataField[]): { [key: string]: unknown } {
+export function filterPayloadToContainOnlyAllowedFields(payload: { [key: string]: unknown }, availableFields: DataField[]): { [key: string]: unknown } {
     const keys = Object.keys(payload);
     const payloadFields: string[] = [];
     keys.map(k => {

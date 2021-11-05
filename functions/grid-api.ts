@@ -1,8 +1,7 @@
 import {Request} from "express";
 import {Sequelize} from "sequelize-typescript";
-import {sequelize} from "../index";
 import {GridQueryParams} from "./grid.interfaces";
-import {createGridRecord, deleteGridRecord, getGrid, getGridRecord} from "./grid.func";
+import {createGridRecord, deleteGridRecord, getGrid, getGridRecord, updateGridRecord} from "./grid.func";
 import {splitRequestedSortingIntoFieldAndSortingDirection} from "./grid-utils.func";
 
 export async function getGridApi(req: Request, sq: Sequelize) {
@@ -65,27 +64,25 @@ export async function getGridRecordApi(req: Request, sq: Sequelize) {
 export async function createGridRecordApi(req: Request, sq: Sequelize) {
     const body = req.body;
     const {dataSetId} = req.params;
-    return await createGridRecord(sequelize, {
+    return await createGridRecord(sq, {
         dataSetId,
         payload: body
     });
 }
 
 export async function updateGridRecordApi(req: Request, sq: Sequelize) {
+    const body = req.body;
+    const {dataSetId, recordId} = req.params;
+    return await updateGridRecord(sq, {
+        dataSetId,
+        recordId,
+        payload: body
+    });
 }
 
 export async function deleteGridRecordApi(req: Request, sq: Sequelize) {
     const {dataSetId, recordId} = req.params;
-    const {fields} = req.query;
+    const force: boolean = req.query?.force === "true";
 
-    if (!dataSetId || !recordId) {
-        return "Error";
-    }
-
-    let fieldArray: string[] = [];
-    if (fields) {
-        fieldArray = fields.toString().split(',');
-    }
-
-    return deleteGridRecord(sq, {dataSetId, recordId, fields: fieldArray})
+    return await deleteGridRecord(sq, {dataSetId, recordId, force});
 }
